@@ -1,0 +1,1 @@
+MQTT - communicates with the boats, Webserver - User Interface for control and display all boats
