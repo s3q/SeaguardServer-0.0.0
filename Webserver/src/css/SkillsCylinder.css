@@ -1,0 +1,53 @@
+.cylinder-container {
+  perspective: 1000px; 
+  /* bottom: 40px; */
+  /* right: 20px;   */
+  flex-direction: row;
+
+
+  height: 150px; /* 3 lines at ~50px each */
+  width: 700px;  /* enough space for your longest skill */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  /* position: absolute; */
+}
+
+.cylinder {
+  width: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 1s ease-in-out;
+}
+
+.cylinder-face {
+  position: absolute;
+  /*left: 50%;
+  */transform-origin: center center;
+  width: 100%;
+  /*<--Thismakesitspanfullcylinderwidth*/text-align: center;
+  color: #6980ff00;
+  font-size: 1rem;
+  font-weight: normal;
+  backface-visibility: hidden;
+  opacity: 0.5;
+  transition: all 0.6s ease;
+  -webkit-transition: all 0.6s ease;
+  -moz-transition: all 0.6s ease;
+  -ms-transition: all 0.6s ease;
+  -o-transition: all 0.6s ease;
+}
+
+
+.cylinder-face.active {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #fff;
+  opacity: 1;
+  transform: scale(1.2) translateZ(100px);
+  -webkit-transform: scale(1.2) translateZ(100px);
+  -moz-transform: scale(1.2) translateZ(100px);
+  -ms-transform: scale(1.2) translateZ(100px);
+  -o-transform: scale(1.2) translateZ(100px);
+}
