@@ -26,9 +26,13 @@ export default function BoatsListPage() {
                 const status = boatStatusById[boat.id];
                 const hasStatus = Boolean(status);
                 const isOnline = status?.apiOnline;
-                const isStale = status?.isStale;
-                const lastUpdate = status?.lastTelemetryAt
-                  ? status.lastTelemetryAt.toLocaleString()
+                const lastSeen = status?.lastSeen;
+                const isStale =
+                  lastSeen instanceof Date
+                    ? Date.now() - lastSeen.getTime() > 10000
+                    : status?.isStale;
+                const lastUpdate = status?.lastSeen
+                  ? status.lastSeen.toLocaleString()
                   : "No telemetry yet";
                 const statusLabel = hasStatus
                   ? isOnline

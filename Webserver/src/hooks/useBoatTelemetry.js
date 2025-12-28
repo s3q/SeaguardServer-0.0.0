@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchSensorData } from "../services/api";
+import { fetchBoatState } from "../services/api";
 import { useBoat } from "../context/BoatContext";
 
 const DEFAULT_POLL_INTERVAL = 2000;
 
 export default function useBoatTelemetry(boat, pollInterval = DEFAULT_POLL_INTERVAL) {
-  const [sensorData, setSensorData] = useState(null);
+  const [boatState, setBoatState] = useState(null);
   const [lastTelemetryAt, setLastTelemetryAt] = useState(null);
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [apiOnline, setApiOnline] = useState(false);
@@ -13,7 +13,7 @@ export default function useBoatTelemetry(boat, pollInterval = DEFAULT_POLL_INTER
   const { updateBoatStatus } = useBoat();
 
   useEffect(() => {
-    setSensorData(null);
+    setBoatState(null);
     setLastTelemetryAt(null);
     setLastCheckedAt(null);
     setApiOnline(false);
@@ -29,7 +29,7 @@ export default function useBoatTelemetry(boat, pollInterval = DEFAULT_POLL_INTER
 
     const poll = async () => {
       try {
-        const data = await fetchSensorData(boat);
+        const data = await fetchBoatState(boat.id);
         if (!isMounted) {
           return;
         }
@@ -38,10 +38,24 @@ export default function useBoatTelemetry(boat, pollInterval = DEFAULT_POLL_INTER
         setLastCheckedAt(new Date());
 
         if (data) {
-          setSensorData(data);
-          setLastTelemetryAt(new Date());
+          setBoatState(data);
+          const lastSeen = data.lastSeen ? new Date(data.lastSeen) : null;
+          const sensorTimestamp = data.sensors?.timestamp;
+          const gpsTimestamp = data.gps?.timestamp;
+          const derivedTimestamp = sensorTimestamp || gpsTimestamp;
+          const telemetryTime = lastSeen
+            ? lastSeen
+            : derivedTimestamp
+              ? new Date(
+                  Number(derivedTimestamp) < 1000000000000
+                    ? Number(derivedTimestamp) * 1000
+                    : Number(derivedTimestamp)
+                )
+              : null;
+          setLastTelemetryAt(telemetryTime);
         } else {
-          setSensorData(null);
+          setBoatState(null);
+          setLastTelemetryAt(null);
         }
       } catch (error) {
         if (!isMounted) {
@@ -73,12 +87,17 @@ export default function useBoatTelemetry(boat, pollInterval = DEFAULT_POLL_INTER
     if (!boat?.id) {
       return;
     }
+    const lastSeen =
+      boatState?.lastSeen !== undefined && boatState?.lastSeen !== null
+        ? new Date(boatState.lastSeen)
+        : null;
     updateBoatStatus(boat.id, {
       apiOnline,
       apiError,
       lastTelemetryAt,
       lastCheckedAt,
       isStale,
+      lastSeen,
     });
   }, [
     boat?.id,
@@ -87,11 +106,12 @@ export default function useBoatTelemetry(boat, pollInterval = DEFAULT_POLL_INTER
     lastTelemetryAt,
     lastCheckedAt,
     isStale,
+    boatState?.lastSeen,
     updateBoatStatus,
   ]);
 
   return {
-    sensorData,
+    boatState,
     lastTelemetryAt,
     lastCheckedAt,
     apiOnline,

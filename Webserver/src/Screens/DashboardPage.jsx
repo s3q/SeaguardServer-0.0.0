@@ -1,5 +1,6 @@
 import React from "react";
 import { Container, Row, Col } from "react-bootstrap";
+import { useLocation } from "react-router-dom";
 import BoatSelector from "../components/BoatSelector";
 import LiveVideo from "../components/LiveVideo";
 import BoatMap from "../components/BoatMap";
@@ -16,6 +17,18 @@ const POLL_INTERVAL_MS = 2000;
 export default function DashboardPage() {
   const { selectedBoat } = useBoat();
   const telemetry = useBoatTelemetry(selectedBoat, POLL_INTERVAL_MS);
+  const location = useLocation();
+  const mapKey = `${selectedBoat?.id || "boat"}-${location.key || location.pathname}`;
+  const gpsTimestamp = telemetry.boatState?.gps?.timestamp;
+  const gpsUpdated = gpsTimestamp
+    ? new Date(
+        Number(gpsTimestamp) < 1000000000000
+          ? Number(gpsTimestamp) * 1000
+          : Number(gpsTimestamp)
+      ).toLocaleString()
+    : telemetry.lastTelemetryAt
+      ? telemetry.lastTelemetryAt.toLocaleString()
+      : null;
 
   const statusLabel = telemetry.apiOnline
     ? telemetry.isStale
@@ -83,17 +96,14 @@ export default function DashboardPage() {
               <Col lg={7} className="dashboard-column">
                 <SensorCards
                   boat={selectedBoat}
-                  data={telemetry.sensorData}
+                  data={telemetry.boatState?.sensors}
                   status={telemetry}
                 />
                 <BoatMap
                   boat={selectedBoat}
-                  data={telemetry.sensorData}
-                  lastUpdated={
-                    telemetry.lastTelemetryAt
-                      ? telemetry.lastTelemetryAt.toLocaleString()
-                      : null
-                  }
+                  data={telemetry.boatState?.gps}
+                  mapKey={mapKey}
+                  lastUpdated={gpsUpdated}
                 />
               </Col>
             </Row>

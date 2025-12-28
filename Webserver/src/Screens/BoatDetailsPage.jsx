@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { Container, Row, Col } from "react-bootstrap";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import BoatMap from "../components/BoatMap";
 import LiveVideo from "../components/LiveVideo";
 import MotorControls from "../components/MotorControls";
@@ -14,6 +14,7 @@ const POLL_INTERVAL_MS = 2000;
 
 export default function BoatDetailsPage() {
   const { id } = useParams();
+  const location = useLocation();
   const { boats, setSelectedBoatId } = useBoat();
   const boat = boats.find((item) => item.id === id);
 
@@ -24,6 +25,17 @@ export default function BoatDetailsPage() {
   }, [boat?.id, setSelectedBoatId]);
 
   const telemetry = useBoatTelemetry(boat, POLL_INTERVAL_MS);
+  const mapKey = `${boat?.id || "boat"}-${location.key || location.pathname}`;
+  const gpsTimestamp = telemetry.boatState?.gps?.timestamp;
+  const gpsUpdated = gpsTimestamp
+    ? new Date(
+        Number(gpsTimestamp) < 1000000000000
+          ? Number(gpsTimestamp) * 1000
+          : Number(gpsTimestamp)
+      ).toLocaleString()
+    : telemetry.lastTelemetryAt
+      ? telemetry.lastTelemetryAt.toLocaleString()
+      : null;
   const statusLabel = telemetry.apiOnline
     ? telemetry.isStale
       ? "Stale"
@@ -102,15 +114,16 @@ export default function BoatDetailsPage() {
                 <MotorControls />
               </Col>
               <Col lg={7} className="dashboard-column">
-                <SensorCards boat={boat} data={telemetry.sensorData} status={telemetry} />
+                <SensorCards
+                  boat={boat}
+                  data={telemetry.boatState?.sensors}
+                  status={telemetry}
+                />
                 <BoatMap
                   boat={boat}
-                  data={telemetry.sensorData}
-                  lastUpdated={
-                    telemetry.lastTelemetryAt
-                      ? telemetry.lastTelemetryAt.toLocaleString()
-                      : null
-                  }
+                  data={telemetry.boatState?.gps}
+                  mapKey={mapKey}
+                  lastUpdated={gpsUpdated}
                 />
               </Col>
             </Row>

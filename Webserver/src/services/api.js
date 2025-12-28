@@ -1,47 +1,59 @@
-const DEFAULT_API_BASE =
+export const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
-const resolveApiBase = (boat) => boat?.apiBase || DEFAULT_API_BASE;
+const requestJson = async (path, options = {}) => {
+  const response = await fetch(`${API_BASE}${path}`, options);
+  const contentType = response.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const data = isJson ? await response.json() : null;
 
-export const buildControlTopic = (boat, direction) => {
-  if (!direction) {
-    return "";
+  if (!response.ok) {
+    const message = data?.error || data?.message || `Request failed (${response.status})`;
+    throw new Error(message);
   }
-  if (boat?.mqttControlPrefix) {
-    return `${boat.mqttControlPrefix}/${direction}`;
-  }
-  return `seaguard/control/${direction}`;
+
+  return data;
 };
 
-export async function fetchSensorData(boat) {
-  const apiBase = resolveApiBase(boat);
-  const endpoint = boat?.dataEndpoint || "/data";
-  const response = await fetch(`${apiBase}${endpoint}`, { cache: "no-store" });
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data ?? null;
+export async function fetchBoats() {
+  return requestJson("/api/boats");
 }
 
-export async function sendControl(boat, topic, cmd) {
-  if (!topic) {
-    throw new Error("Control topic is required.");
-  }
+export async function fetchBoatState(boatId) {
+  return requestJson(`/api/boats/${encodeURIComponent(boatId)}/state`, {
+    cache: "no-store",
+  });
+}
 
-  const apiBase = resolveApiBase(boat);
-  const safeCmd = encodeURIComponent(cmd);
-  const response = await fetch(`${apiBase}/control/${topic}/${safeCmd}`);
-
-  if (!response.ok) {
-    throw new Error(`Control error: ${response.status}`);
+export async function fetchBoatHistory(boatId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.sensors) {
+    params.set("sensors", "1");
   }
-
-  try {
-    return await response.json();
-  } catch (error) {
-    return null;
+  if (options.gps) {
+    params.set("gps", "1");
   }
+  if (options.limit) {
+    params.set("limit", String(options.limit));
+  }
+  const query = params.toString();
+  return requestJson(`/api/boats/${encodeURIComponent(boatId)}/history${query ? `?${query}` : ""}`);
+}
+
+export async function sendControl(boatId, action, payload) {
+  return requestJson(`/api/boats/${encodeURIComponent(boatId)}/control`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, payload }),
+  });
+}
+
+export async function fetchAck(boatId, cmdId) {
+  return requestJson(
+    `/api/boats/${encodeURIComponent(boatId)}/acks/${encodeURIComponent(cmdId)}`
+  );
+}
+
+export async function fetchVideoInfo(boatId) {
+  return requestJson(`/api/boats/${encodeURIComponent(boatId)}/video/info`);
 }

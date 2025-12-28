@@ -1,18 +1,70 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { API_BASE, fetchVideoInfo } from "../services/api";
 import "../css/dashboard.css";
 
 export default function LiveVideo({ boat }) {
   const videoRef = useRef(null);
   const [hasError, setHasError] = useState(false);
+  const [streamInfo, setStreamInfo] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const stream = boat?.video;
-  const type = stream?.type || "mp4";
-  const url = stream?.url;
+  const type = streamInfo?.type || boat?.video?.type || "mp4";
+  const url = streamInfo?.url || boat?.video?.url;
 
   useEffect(() => {
     setHasError(false);
   }, [boat?.id, url, type]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadVideoInfo = async () => {
+      if (!boat?.id) {
+        setStreamInfo(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const info = await fetchVideoInfo(boat.id);
+        if (!isMounted) {
+          return;
+        }
+        const resolvedUrl =
+          info?.mode === "redirect"
+            ? `${API_BASE}/api/boats/${boat.id}/video/${info.type}`
+            : info?.url;
+
+        setStreamInfo({
+          type: info?.type || boat?.video?.type,
+          url: resolvedUrl || info?.url || boat?.video?.url,
+        });
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        if (boat?.video) {
+          setStreamInfo({
+            type: boat.video.type,
+            url: boat.video.url,
+          });
+        } else {
+          setStreamInfo(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadVideoInfo();
+    return () => {
+      isMounted = false;
+    };
+  }, [boat?.id, boat?.video?.type, boat?.video?.url]);
 
   useEffect(() => {
     if (!url || type !== "hls" || !videoRef.current) {
@@ -49,7 +101,8 @@ export default function LiveVideo({ boat }) {
         </div>
       </div>
       <div className="video-frame">
-        {!url && <div className="video-overlay">No video source</div>}
+        {!url && !isLoading && <div className="video-overlay">No video source</div>}
+        {isLoading && <div className="video-overlay">Loading stream...</div>}
         {url && type === "mjpeg" && (
           <img
             src={url}

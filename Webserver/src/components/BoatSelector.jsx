@@ -13,7 +13,11 @@ export default function BoatSelector() {
     ? boatStatusById[selectedBoat.id]
     : null;
   const selectedOnline = selectedStatus?.apiOnline;
-  const selectedStale = selectedStatus?.isStale;
+  const selectedLastSeen = selectedStatus?.lastSeen;
+  const selectedStale =
+    selectedLastSeen instanceof Date
+      ? Date.now() - selectedLastSeen.getTime() > 10000
+      : selectedStatus?.isStale;
   const hasStatus = Boolean(selectedStatus);
   const selectedDotClass = hasStatus
     ? selectedOnline
@@ -34,7 +38,11 @@ export default function BoatSelector() {
           const status = boatStatusById[boat.id];
           const hasBoatStatus = Boolean(status);
           const isOnline = status?.apiOnline;
-          const isStale = status?.isStale;
+          const lastSeen = status?.lastSeen;
+          const isStale =
+            lastSeen instanceof Date
+              ? Date.now() - lastSeen.getTime() > 10000
+              : status?.isStale;
           const dotClass = hasBoatStatus
             ? isOnline
               ? isStale

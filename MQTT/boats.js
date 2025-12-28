@@ -1,4 +1,4 @@
-export const BOATS = [
+module.exports = [
   {
     id: "default",
     name: "SeaGuard Default",

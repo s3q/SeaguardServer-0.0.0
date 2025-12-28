@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -33,7 +33,18 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-export default function BoatMap({ boat, data, lastUpdated }) {
+function MapUpdater({ center }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.setView(center, map.getZoom(), { animate: true });
+  }, [map, center]);
+
+  return null;
+}
+
+export default function BoatMap({ boat, data, lastUpdated, mapKey }) {
+  const [mapInstance, setMapInstance] = useState(null);
   const gps = useMemo(() => {
     const nestedGps =
       data?.gps && typeof data.gps === "object" ? data.gps : undefined;
@@ -64,13 +75,14 @@ export default function BoatMap({ boat, data, lastUpdated }) {
 
   const showMarker = gps.lat !== null && gps.lon !== null;
 
-  const MapUpdater = ({ center: nextCenter }) => {
-    const map = useMap();
-    React.useEffect(() => {
-      map.setView(nextCenter, map.getZoom(), { animate: true });
-    }, [map, nextCenter]);
-    return null;
-  };
+  useEffect(() => {
+    return () => {
+      if (mapInstance) {
+        mapInstance.off();
+        mapInstance.remove();
+      }
+    };
+  }, [mapInstance]);
 
   return (
     <div className="spcard map-card">
@@ -81,7 +93,13 @@ export default function BoatMap({ boat, data, lastUpdated }) {
         </div>
       </div>
       <div className="map-frame">
-        <MapContainer center={center} zoom={13} scrollWheelZoom={false}>
+        {/*<MapContainer
+          key={mapKey || `${boat?.id || "boat"}-${center.join(",")}`}
+          center={center}
+          zoom={13}
+          scrollWheelZoom={false}
+          whenCreated={setMapInstance}
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -97,7 +115,7 @@ export default function BoatMap({ boat, data, lastUpdated }) {
               </Popup>
             </Marker>
           )}
-        </MapContainer>
+        </MapContainer>*/}
         {!showMarker && <div className="map-overlay">No GPS yet</div>}
       </div>
     </div>

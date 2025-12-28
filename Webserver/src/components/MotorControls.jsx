@@ -1,39 +1,122 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert, Button, Form } from "react-bootstrap";
-import { buildControlTopic, sendControl } from "../services/api";
+import { fetchAck, sendControl } from "../services/api";
 import { useBoat } from "../context/BoatContext";
 import "../css/dashboard.css";
 
 const SPEEDS = ["SLOW", "MED", "FAST"];
+const ACK_POLL_INTERVAL_MS = 600;
+const ACK_TIMEOUT_MS = 6000;
 
 export default function MotorControls() {
   const { selectedBoat } = useBoat();
   const [speed, setSpeed] = useState("SLOW");
   const [lastCommand, setLastCommand] = useState(null);
-  const [status, setStatus] = useState(null);
+  const [commandStatus, setCommandStatus] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const isDisabled = isSending || !selectedBoat;
+  const requestRef = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setLastCommand(null);
+    setCommandStatus(null);
+  }, [selectedBoat?.id]);
+
+  const pollForAck = async (boatId, cmdId, requestId) => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < ACK_TIMEOUT_MS) {
+      await new Promise((resolve) => setTimeout(resolve, ACK_POLL_INTERVAL_MS));
+
+      if (!isMountedRef.current || requestId !== requestRef.current) {
+        return null;
+      }
+
+      try {
+        const ack = await fetchAck(boatId, cmdId);
+        if (ack?.status && ack.status !== "pending") {
+          return ack;
+        }
+      } catch (error) {
+        return { status: "fail", reason: error?.message || "Ack fetch failed" };
+      }
+    }
+
+    return { status: "timeout" };
+  };
 
   const handleSend = async (direction) => {
-    const topic = buildControlTopic(selectedBoat, direction);
     const cmd = direction === "stop" ? "STOP" : speed;
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
 
     setIsSending(true);
-    setStatus(null);
+    setCommandStatus({
+      state: "pending",
+      message: "Sending command...",
+    });
 
     try {
-      await sendControl(selectedBoat, topic, cmd);
+      const response = await sendControl(selectedBoat.id, direction, cmd);
+      const cmdId = response?.cmdId;
       setLastCommand(`${direction.toUpperCase()} - ${cmd}`);
-      setStatus({ variant: "success", message: "Command sent successfully." });
+      setCommandStatus({
+        state: "pending",
+        message: "Command sent. Awaiting ACK...",
+      });
+
+      if (cmdId) {
+        const ack = await pollForAck(selectedBoat.id, cmdId, requestId);
+        if (!isMountedRef.current || requestId !== requestRef.current) {
+          return;
+        }
+        if (ack?.status === "ok" || ack?.ok === true) {
+          setCommandStatus({
+            state: "ok",
+            message: "Command acknowledged.",
+          });
+        } else if (ack?.status === "fail" || ack?.ok === false) {
+          setCommandStatus({
+            state: "fail",
+            message: ack?.reason || "Command failed.",
+          });
+        } else if (ack?.status === "timeout") {
+          setCommandStatus({
+            state: "timeout",
+            message: "ACK timeout.",
+          });
+        } else {
+          setCommandStatus({
+            state: "ok",
+            message: "ACK received.",
+          });
+        }
+      }
     } catch (error) {
-      setStatus({
-        variant: "danger",
+      setCommandStatus({
+        state: "fail",
         message: error?.message || "Failed to send command.",
       });
     } finally {
       setIsSending(false);
     }
   };
+
+  const alertVariant =
+    commandStatus?.state === "ok"
+      ? "success"
+      : commandStatus?.state === "pending"
+        ? "warning"
+        : commandStatus?.state === "timeout"
+          ? "secondary"
+          : "danger";
 
   return (
     <div className="motor-controls">
@@ -95,14 +178,14 @@ export default function MotorControls() {
           </Button>
         </div>
 
-        {status && (
+        {commandStatus && (
           <Alert
-            variant={status.variant}
+            variant={alertVariant}
             className="control-alert"
             dismissible
-            onClose={() => setStatus(null)}
+            onClose={() => setCommandStatus(null)}
           >
-            {status.message}
+            {commandStatus.message}
           </Alert>
         )}
 
