@@ -5,10 +5,12 @@ import "../css/dashboard.css";
 const PRIMARY_KEYS = new Set([
   "temp",
   "temperature",
+  "temp_c",
   "humidity",
   "hum",
   "battery",
   "batteryVoltage",
+  "battery_v",
   "voltage",
   "lat",
   "latitude",
@@ -74,10 +76,10 @@ const toNumber = (value) => {
 
 export default function SensorCards({ boat, data, status }) {
   const metrics = useMemo(() => {
-    const temp = pickValue(data, ["temp", "temperature"]);
+    const temp = pickValue(data, ["temp", "temperature", "temp_c"]);
     const humidity = pickValue(data, ["humidity", "hum"]);
     const battery = pickValue(data, ["battery"]);
-    const voltage = pickValue(data, ["voltage", "batteryVoltage"]);
+    const voltage = pickValue(data, ["voltage", "batteryVoltage", "battery_v"]);
     const timestamp = pickValue(data, ["timestamp", "time", "ts"]);
 
     const gps =

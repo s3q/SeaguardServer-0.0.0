@@ -15,6 +15,9 @@ const ACK_LIMIT = 200;
 const ACK_MAX_AGE_MS = 5 * 60 * 1000;
 const ONLINE_WINDOW_MS = 10 * 1000;
 const CONTROL_COOLDOWN_MS = 100;
+const BOAT_STATE_TTL_MS = 15 * 60 * 1000;
+const BOAT_STATE_PRUNE_MS = 60 * 1000;
+const MAX_BOATS = 100;
 
 const DEFAULT_BOAT_ID = "default";
 const ALLOWED_ACTIONS = new Set(["forward", "back", "left", "right", "stop"]);
@@ -38,7 +41,12 @@ const normalizeTimestamp = (value) => {
   if (!Number.isFinite(numeric)) {
     return Date.now();
   }
-  return numeric < 1e12 ? numeric * 1000 : numeric;
+  const normalized = numeric < 1e12 ? numeric * 1000 : numeric;
+  const now = Date.now();
+  if (normalized < 1e12 || normalized > now + 10 * 60 * 1000) {
+    return now;
+  }
+  return normalized;
 };
 
 const getBoatState = (boatId) => {
@@ -85,6 +93,41 @@ const pruneAcks = (pendingAcks) => {
       .slice(0, keys.length - ACK_LIMIT)
       .forEach((cmdId) => {
         delete pendingAcks[cmdId];
+      });
+  }
+};
+
+const pruneBoatState = () => {
+  const now = Date.now();
+  for (const [boatId, state] of Object.entries(boatsState)) {
+    const hasPendingAcks =
+      state?.pendingAcks && Object.keys(state.pendingAcks).length > 0;
+    if (hasPendingAcks) {
+      continue;
+    }
+    const lastSeen = state?.lastSeen;
+    if (lastSeen && now - lastSeen > BOAT_STATE_TTL_MS) {
+      delete boatsState[boatId];
+      continue;
+    }
+    if (!lastSeen && !boatConfigMap.has(boatId)) {
+      delete boatsState[boatId];
+    }
+  }
+
+  const boatIds = Object.keys(boatsState);
+  if (boatIds.length > MAX_BOATS) {
+    boatIds
+      .sort((a, b) => {
+        const aTime = boatsState[a]?.lastSeen || 0;
+        const bTime = boatsState[b]?.lastSeen || 0;
+        return aTime - bTime;
+      })
+      .slice(0, boatIds.length - MAX_BOATS)
+      .forEach((boatId) => {
+        if (!boatConfigMap.has(boatId)) {
+          delete boatsState[boatId];
+        }
       });
   }
 };
@@ -187,6 +230,11 @@ aedes.on("publish", function (packet) {
   const boatId = parts[1];
   const channel = parts[2];
 
+  if (!isValidBoatId(boatId)) {
+    console.warn(`Invalid boatId on ${topic}`);
+    return;
+  }
+
   if (!["sensors", "gps", "status", "ack"].includes(channel)) {
     return;
   }
@@ -230,6 +278,11 @@ aedes.on("publish", function (packet) {
     pruneAcks(boatState.pendingAcks);
   }
 });
+
+const pruneInterval = setInterval(pruneBoatState, BOAT_STATE_PRUNE_MS);
+if (typeof pruneInterval.unref === "function") {
+  pruneInterval.unref();
+}
 
 // -----------------------------
 // HTTP API (Express on 3000)

@@ -36,6 +36,10 @@ export default function BoatDetailsPage() {
     : telemetry.lastTelemetryAt
       ? telemetry.lastTelemetryAt.toLocaleString()
       : null;
+  const sensorData = {
+    ...(telemetry.boatState?.sensors || {}),
+    ...(telemetry.boatState?.gps ? { gps: telemetry.boatState.gps } : {}),
+  };
   const statusLabel = telemetry.apiOnline
     ? telemetry.isStale
       ? "Stale"
@@ -116,7 +120,7 @@ export default function BoatDetailsPage() {
               <Col lg={7} className="dashboard-column">
                 <SensorCards
                   boat={boat}
-                  data={telemetry.boatState?.sensors}
+                  data={sensorData}
                   status={telemetry}
                 />
                 <BoatMap

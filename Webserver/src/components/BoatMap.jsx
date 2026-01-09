@@ -93,7 +93,7 @@ export default function BoatMap({ boat, data, lastUpdated, mapKey }) {
         </div>
       </div>
       <div className="map-frame">
-        {/*<MapContainer
+        {<MapContainer
           key={mapKey || `${boat?.id || "boat"}-${center.join(",")}`}
           center={center}
           zoom={13}
@@ -115,7 +115,7 @@ export default function BoatMap({ boat, data, lastUpdated, mapKey }) {
               </Popup>
             </Marker>
           )}
-        </MapContainer>*/}
+        </MapContainer>}
         {!showMarker && <div className="map-overlay">No GPS yet</div>}
       </div>
     </div>

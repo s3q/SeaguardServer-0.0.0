@@ -25,6 +25,8 @@ export default function MotorControls() {
   }, []);
 
   useEffect(() => {
+    requestRef.current += 1;
+    setIsSending(false);
     setLastCommand(null);
     setCommandStatus(null);
   }, [selectedBoat?.id]);
